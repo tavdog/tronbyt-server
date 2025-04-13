@@ -72,6 +72,10 @@
 
 <!-- ...existing script code... -->
 <script>
+  // Add this at the top of your script section
+  const refreshIntervals = {};
+  const refreshStates = {};
+
   // Function to update the numeric display in real-time (on slider move)
   function updateBrightnessValue(deviceId, brightness) {
     document.getElementById(`brightnessValue-${deviceId}`).innerText = brightness;
@@ -145,17 +149,35 @@
   // Function to reload the currentwebp image at the interval of app cycle time
   function reloadCurrentWebp(deviceId, interval) {
     const currentWebpImg = document.getElementById(`currentWebp-${deviceId}`);
-    setInterval(() => {
-      const timestamp = new Date().getTime(); // Prevent caching
-      currentWebpImg.src = `${currentWebpImg.dataset.src}?t=${timestamp}`;
+    refreshStates[deviceId] = true; // Initialize as running
+    refreshIntervals[deviceId] = setInterval(() => {
+      if (refreshStates[deviceId]) { // Only refresh if state is true
+        const timestamp = new Date().getTime();
+        currentWebpImg.src = `${currentWebpImg.dataset.src}?t=${timestamp}`;
+      }
     }, interval * 1000);
+  }
+
+  // Add new function to toggle refresh
+  function toggleRefresh(deviceId) {
+    const button = document.getElementById(`refreshToggle-${deviceId}`);
+    refreshStates[deviceId] = !refreshStates[deviceId];
+    
+    if (refreshStates[deviceId]) {
+      button.innerHTML = '<i class="fas fa-pause"></i>';
+      button.title = "Pause refresh";
+    } else {
+      button.innerHTML = '<i class="fas fa-play"></i>';
+      button.title = "Resume refresh";
+    }
   }
 
   // Initialize the reload function for each device
   document.addEventListener("DOMContentLoaded", function () {
     {% for device in devices %}
     reloadCurrentWebp('{{ device['id'] }}', {{ device['default_interval'] }});
-  {% endfor %}
+    refreshStates['{{ device['id'] }}'] = true;
+    {% endfor %}
   });
 
   function toggleApps(deviceId) {
@@ -192,9 +214,21 @@
             </header>
           </td>
           <td rowspan="4" width="40%">
-            <div class="app-img"><img id="currentWebp-{{ device['id'] }}"
-                data-src="{{url_for('manager.currentwebp', device_id=device['id']) }}"
-                src="{{url_for('manager.currentwebp', device_id=device['id']) }}" alt="{{ _('Preview') }}"></div>
+            <div class="app-img">
+              <div style="position: relative;">
+                <img id="currentWebp-{{ device['id'] }}"
+                    data-src="{{url_for('manager.currentwebp', device_id=device['id']) }}"
+                    src="{{url_for('manager.currentwebp', device_id=device['id']) }}"
+                    alt="{{ _('Preview') }}">
+                <button id="refreshToggle-{{ device['id'] }}"
+                        onclick="toggleRefresh('{{ device['id'] }}')"
+                        class="w3-button w3-circle w3-tiny"
+                        style="position: absolute; top: 5px; right: 5px; padding: 4px 8px; background: rgba(0,0,0,0.5); color: white;"
+                        title="Pause refresh">
+                  <i class="fas fa-pause"></i>
+                </button>
+              </div>
+            </div>
             <br>{{ _('Currently Displaying App') }}
           </td>
         </tr>
